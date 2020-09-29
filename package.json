@@ -1,0 +1,19 @@
+{
+  "name": "skriboo",
+  "version": "1.0.0",
+  "description": "Skriboo app for emotion recognition from handwriting",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/needdrive811/skriboo-fe"
+  },
+  "author": "Lamaro Digital",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/needdrive811/skriboo-fe/issues"
+  },
+  "homepage": "https://grafologijajezakon.herokuapp.com/"
+}

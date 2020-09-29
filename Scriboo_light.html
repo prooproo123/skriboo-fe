@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<!-- Reference Links
+	https://patrickhlauke.github.io/touch/tests/event-listener-force-pressure.html 
+	https://codepen.io/kangax/pen/zofsp 
+	https://developer.mozilla.org/en-US/docs/Web/API/PointerEvent 
+	https://www.w3.org/TR/pointerevents/ 
+	https://en.wikipedia.org/wiki/B%C3%A9zier_curve 
+	https://stackoverflow.com/questions/10673122/how-to-save-canvas-as-an-image-with-canvas-todataurl 
+	https://docs.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/samples/hh779016(v=vs.85) 
+	https://stackoverflow.com/questions/24861073/detect-if-any-kind-of-ie-msie/24861307 
+	https://stackoverflow.com/questions/33152523/how-do-i-detect-ie-and-edge-browser 
+	https://codepen.io/kangax/pen/vGxEm 
+	https://www.w3schools.com/jsref/tryit.asp?filename=tryjsref_style_cursor2 
+	https://stackoverflow.com/questions/737022/how-do-i-disable-right-click-on-my-web-page
+
+
+	https://www.w3.org/TR/pointerevents1
+	https://codepen.io/kangax/pen/zofsp
+	http://perfectionkills.com/exploring-canvas-drawing-techniques/#bezier-curves
+ -->
+
+<html>
+
+<head>
+
+	<title>Skriboo</title>
+	<style>
+		h1,
+		h2,
+		h3,
+		p {
+			padding: 0;
+			margin: 0;
+		}
+
+		.promptLabel {
+			display: inline-block;
+			margin-top: 60px;
+			float: right;
+		}
+
+		.actionButton {
+			float: right;
+			margin-top: 0px;
+			margin-left: 10px;
+		}
+
+		.actionButtonGroup {
+			display: inline-block;
+			margin-top: 0px;
+			float: right;
+		}
+
+		.skriboo-logo-container {
+			display: inline-block;
+			margin-top: 0px;
+			float: left;
+		}
+
+		.skriboo-logo-image {
+			height: 40px;
+		}
+
+
+		.inlineBlockChild {
+			margin-left: 0px;
+			margin-right: 0px;
+			width: 36px;
+			display: inline-block;
+			margin: auto;
+			float: left;
+		}
+
+		.buttonGroup button {
+			margin-left: 0px;
+			margin-right: 0px;
+			margin-bottom: 5px;
+			cursor: pointer;
+			/* Pointer/hand icon */
+			/* toggle effect */
+			border-top-width: 3px;
+			border-right-width: 3px;
+			border-left-width: 3px;
+			border-bottom-width: 3px;
+			border-bottom-color: black;
+			display: block;
+			/* Make the buttons appear stacked */
+		}
+
+		.buttonGroup label {
+			padding-top: 10px;
+			padding-bottom: 10px;
+			font-size: 20px;
+			display: block;
+			/* Make the labels appear stacked */
+		}
+
+		.canvasDiv {
+			text-align: center;
+			margin-left: auto;
+			margin-right: auto;
+		}
+
+
+		div {
+			/*border: 1px solid black;*/
+			padding: 5px;
+			padding-top: 10px;
+			margin-bottom: 10px;
+		}
+
+		#myCanvas {
+			touch-action: none;
+			/*prevent canvas scrolling and system touch behavior*/
+			display: block;
+			/* This doesn't ensure background color saved in image.
+				background-color: tan;
+				See https://stackoverflow.com/questions/6957034/save-canvas-with-background-image
+			*/
+		}
+	</style>
+</head>
+
+<body onload="initPage()" onresize="setCanvasProps()" oncontextmenu="return false;">
+	<div class='parent'>
+
+		<!-- 		<div id="handRadio" class="radioButtonGroup">
+			<input type="radio" id="hand1" name="hand" checked value="R"> R
+			<input type="radio" id="hand2" name="hand" value="L"> L
+		</div> -->
+
+		<div id="logo" class="skriboo-logo-container">
+			<img src="img/skriboo_logo.png" class="skriboo-logo-image" />
+		</div>
+
+		<div class="actionButtonGroup">
+			<button type="button" class="actionButton" onclick="clearCanvas()" style="font-size:20px">Obriši</button>
+			<!-- <button type="button" class="actionButton" onclick="saveCanvas()" style="font-size:20px">Save image</button> -->
+			<button type="button" class="actionButton" onclick="saveData()" style="font-size:20px">Pošalji</button>
+		</div>
+
+	</div>
+
+	<div class="canvasDiv">
+		<canvas id="myCanvas" height="800" style="border:1px solid #d3d3d3;">
+			Vaš browser ne podržava canvas element
+		</canvas>
+	</div>
+	<!-- 	<div>
+		<h1>Pointer data:</h1>
+		<button type="button" class="actionButton" onclick="clearReport()" style="font-size:20px">Clear</button>
+		<p id="showData" style="font-size:25px" onclick="toggleShowData()">Click to enable showing pointer data</p>
+	</div>
+	<div class="reportDiv">
+		<output id="reportElement" style="font-size:20px"></output>
+	</div> 
+	<div id="responseElement">
+	</div>
+
+	<h2 id="scribblePrompt"></h2>
+
+	<a id="link" target="_blank"></a>-->
+
+	<script>
+		/////////////////////////////////////////////////////////////////////////
+
+		const xhr = new XMLHttpRequest();
+
+		var data = [];
+
+		const colorBackground = "rgba(255, 255, 255, 1)";	// white
+		const selectedColor = "black";
+
+		var myCanvas = document.getElementById("myCanvas");
+		var reportElem = document.getElementById("reportElement");
+		var context = myCanvas.getContext("2d");
+		var supportsPointerEvents = window.PointerEvent;
+		var posLast = { x: 0, y: 0 };
+		var isDrawing = false;
+		/* 		var reportData = false; */
+		var useTilt = true;
+
+		var EPenButton =
+		{
+			tip: 0x1,		// left mouse, touch contact, pen contact
+			barrel: 0x2,		// right mouse, pen barrel button
+			middle: 0x4,		// middle mouse
+			eraser: 0x20		// pen eraser button
+		};
+
+		/////////////////////////////////////////////////////////////////////////
+
+		var scribblePrompt = document.getElementById("scribblePrompt");
+		if (!supportsPointerEvents) {
+			scribblePrompt.textContent += " Vaš browser ne podržava PointerEvents";
+		}
+
+
+		/////////////////////////////////////////////////////////////////////////
+		// Initialize page elements
+		//
+		function initPage() {
+			setCanvasProps();
+		}
+
+		/////////////////////////////////////////////////////////////////////////
+		// Init canvas properties.
+		// Set's canvas width to expand to browser window.
+		// Canvas cleared to restore background color.
+		//
+		function setCanvasProps() {
+			if (myCanvas.width < window.innerWidth) {
+				myCanvas.width = window.innerWidth - 20;
+			}
+			clearCanvas();	// ensures background saved with drawn image
+		}
+
+		/////////////////////////////////////////////////////////////////////////
+		// Clears the drawing canvas.
+		//
+		function clearCanvas() {
+
+			// clear saved point data
+			data = [];
+
+			// fill wit background color
+			context.fillStyle = colorBackground;
+			context.fillRect(0, 0, myCanvas.width, myCanvas.height);
+
+			/* // clear everything - transparent background
+			context.clearRect(0, 0, myCanvas.width, myCanvas.height); */
+		}
+
+
+		function saveData() {
+
+			var deviceFileProperties = { type: 'text/plain' };
+			var imageFileProperties = { type: 'image/png' };
+
+			var dataStringyfied = JSON.stringify(data);
+
+			var exportArray = [];
+			exportArray.push(dataStringyfied);
+
+
+			var today = new Date(),
+				year = today.getFullYear(),
+				month = today.getMonth() + 1,
+				day = today.getDate(),
+				hours = today.getHours(),
+				minutes = today.getMinutes(),
+				seconds = today.getSeconds(),
+				time = year.toString() + "-" + month.toString() + "-" + day.toString() + "-" + hours.toString() + "-" + minutes.toString() + "-" + seconds.toString();
+
+			const deviceFileTitle = "skriboo_" + time + ".json";
+			const imageTitle = "skriboo_" + time + ".png";
+
+			let deviceFile;
+			try {
+				// Specify the filename using the File constructor, but ...
+				deviceFile = new File(exportArray, deviceFileTitle, deviceFileProperties);
+			} catch (e) {
+				// ... fall back to the Blob constructor if that isn't supported.
+				deviceFile = new Blob(exportArray, deviceFileProperties);
+			}
+
+			const formData = new FormData();
+
+			formData.append('device', deviceFile)
+
+			// Define what happens on successful data submission
+			xhr.onload = () => {
+				// Process our return data
+				if (xhr.readyState == 4 && xhr.status == 200) {
+					// Runs when the request is successful
+					var result = JSON.parse(xhr.responseText);
+					alert(result.prediction);
+				}
+			};
+			// Define what happens in case of error
+			xhr.onerror = () => {
+				alert('Oops! Something went wrong.');
+			};
+
+			xhr.open("POST", "https://skriboo-be.herokuapp.com/extract");
+
+			// save image
+			let imageFile;
+			myCanvas.toBlob((blob) => {
+
+				imageFile = new File([blob], imageTitle, imageFileProperties);
+
+				formData.append('image', imageFile)
+				xhr.send(formData);
+			});
+
+
+		}
+
+
+		/////////////////////////////////////////////////////////////////////////
+		// Upon a window load event, registers all events.
+		//
+		window.addEventListener('load', function () {
+
+			var canvasRect = myCanvas.getBoundingClientRect();
+
+			// These events are for browsers that handle
+			// HTML5 PointerEvent events.
+			var pointerEvents = [
+				'pointerdown',
+				'pointerup',
+				'pointercancel',
+				'pointermove',
+				'pointerover',
+				'pointerout',
+				'pointerenter',
+				'pointerleave',
+				'gotpointercapture',
+				'lostpointercapture'
+			];
+
+
+			/////////////////////////////////////////////////////////////////////////
+			// Find point between two other points.
+			//
+			function midPointsBetween(p1, p2) {
+				return {
+					x1: p1.x + (p2.x - p1.x) / 3,
+					y1: p1.y + (p2.y - p1.y) / 3,
+					x2: p1.x + 2 * (p2.x - p1.x) / 3,
+					y2: p1.y + 2 * (p2.y - p1.y) / 3,
+				};
+			}
+
+			/////////////////////////////////////////////////////////////////////////
+			// Handle drawing for HTML5 Pointer Events.
+			//
+			// Pen drawing logic
+			function pointerEventDraw(evt) {
+
+				console.log(evt.type, evt);
+
+				/* var outStr = ""; */
+
+				var screenPos = {
+					x: evt.clientX,
+					y: evt.clientY
+				};
+
+				var pos = {
+					x: screenPos.x - canvasRect.left,
+					y: screenPos.y - canvasRect.top
+				};
+
+				var pressure = evt.pressure;
+				var buttons = evt.buttons;
+				var tilt = { x: evt.tiltX, y: evt.tiltY };
+				// var rotate = evt.twist;
+
+				/* 				if (reportData) {
+									outStr = evt.pointerType + " , " + evt.type + " : "
+								} */
+
+				if (evt.pointerType) {
+					switch (evt.pointerType) {
+						case "touch":
+							// A touchscreen was used - not needed in our data
+							/* 							pressure = 1.0;
+														context.strokeStyle = "red";
+														context.lineWidth = pressure;
+														break; */
+							return;
+						case "pen":
+							// A pen was used
+							/* 							if (buttons == EPenButton.barrel) {
+															context.strokeStyle = colorBackground;
+														}
+														else { */
+							context.strokeStyle = selectedColor;
+							/* 							} */
+
+							if (useTilt && tilt.x !== 0) {
+								// Favor tilts in x direction. - TODO - y direction data also?
+								context.lineWidth = pressure * 10 * (1 - Math.abs(tilt.x / 90));
+								// Uncomment for a "vaseline" (smeary) effect:
+								//context.shadowColor = "blue";
+								//context.shadowBlur = context.lineWidth / 2;
+							}
+							else {
+								context.lineWidth = pressure * 2;
+							}
+							break;
+						case "mouse":
+							// A mouse was used - not needed in our data
+							//pressure = 2;
+							//context.lineWidth = pressure;
+							/* 							context.strokeStyle = "blue";
+														if (buttons == EPenButton.barrel) {
+															pressure = 0;
+															context.lineWidth = 0;
+														}
+							
+														context.lineWidth = pressure;
+														break; */
+							return;
+					}
+
+					/* 					// If pen erase button is being used, then erase!
+										if (buttons == EPenButton.eraser) {
+											context.strokeStyle = colorBackground;
+										} */
+
+					switch (evt.type) {
+						case "pointerdown":
+							isDrawing = true;
+							posLast = pos;
+							break;
+
+						case "pointerup":
+							isDrawing = false;
+
+							break;
+
+						case "pointermove":
+							if (!isDrawing) {
+								break;
+							}
+
+							// If using eraser button, then erase with background color.
+							/* 							if (buttons == EPenButton.eraser) {
+															var eraserSize = 10;
+															context.clearRect(pos.x, pos.y, eraserSize, eraserSize);
+														} */
+
+							//TODO:Bezier curves and drawing multiple lines
+							//http://perfectionkills.com/exploring-canvas-drawing-techniques/#bezier-curves
+							//code above works, but changes pressure of entire line
+
+							if (pressure > 0 && evt.pointerType === 'pen') {
+								context.beginPath();
+								context.lineCap = "round";
+								context.moveTo(posLast.x, posLast.y);
+
+								// Draws Bezier curve from context position to midPoints.
+								var midPoints = midPointsBetween(posLast, pos);
+								context.bezierCurveTo(midPoints.x1, midPoints.y1, midPoints.x2, midPoints.y2, pos.x, pos.y);
+
+								// This lineTo call eliminates gaps (but leaves flat lines if stroke
+								// is fast enough).
+								//context.quadraticCurveTo(midPoints.x2, midPoints.y2, pos.x, pos.y);
+								context.lineTo(pos.x, pos.y);
+								context.stroke();
+							}
+							posLast = pos;
+							break;
+
+						case "pointerenter":
+							document.body.style.cursor = "crosshair";
+							break;
+
+						case "pointerleave":
+							document.body.style.cursor = "default";
+							break;
+
+						default:
+							/* outStr += "WARNING: unhandled event: " + evt.type; */
+							// console.log("WARNING: unhandled event: " + evt.type);
+							break;
+					}
+
+					//event.timeStamp returns time passed from event listener init
+					if (evt.pointerType === 'pen') {
+						var pointerData = {
+							time: parseFloat(evt.timeStamp).toFixed(4),
+							pointerId: evt.pointerId,
+							x: parseFloat(screenPos.x).toFixed(4),
+							y: parseFloat(screenPos.y).toFixed(4),
+							P: parseFloat(pressure).toFixed(4),
+							Tx: parseFloat(tilt.x).toFixed(4),
+							Ty: parseFloat(tilt.y).toFixed(4),
+							// R: parseFloat(rotate).toFixed(3),
+							isDrawing: isDrawing,
+						};
+
+						// console.log(pointerData);
+
+						data.push(pointerData);
+
+					}
+
+				}
+			}
+
+			// These event handlers are set up once when the page is loaded.
+			// Note that there are two alternate sets of handlers depending on whether
+			// PointerEvents are handled.
+			if (supportsPointerEvents) {
+				// if Pointer Events are supported, only listen to pointer events
+				for (var idx = 0; idx < pointerEvents.length; idx++) {
+					myCanvas.addEventListener(pointerEvents[idx], pointerEventDraw, false);
+				}
+			}
+			else {
+				/* 				// traditional mouse/touch/pen event handlers
+								for (var idx = 0; idx < events.length; idx++) {
+									myCanvas.addEventListener(events[idx], eventDraw, false);
+								} */
+				console.warn("no pointer events suported")
+			}
+		}, true);
+	</script>
+
+</body>
+
+</html>
